@@ -1,0 +1,28 @@
+base_config: configs/default.yaml
+scenario_output_tag: baseline_robustness
+
+scenarios:
+  - name: baseline_aic
+    overrides: {}
+
+  - name: bic_selection
+    overrides:
+      stage2:
+        ic: bic
+
+  - name: shorter_lag_search
+    overrides:
+      stage2:
+        maxlags: 12
+
+  - name: stl_level_decomposition
+    overrides:
+      stage1:
+        log_input: false
+
+  - name: fedfunds_first_difference
+    overrides:
+      stage2:
+        transforms:
+          FEDFUNDS: diff
+

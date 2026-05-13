@@ -1,0 +1,35 @@
+# Byte-compiled / optimized
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# Data artifacts
+data/raw/*.csv
+data/interim/*.csv
+data/processed/*.csv
+data/raw/**/*.csv
+data/interim/**/*.csv
+data/processed/**/*.csv
+
+# Output artifacts
+outputs/figures/*.png
+outputs/tables/*.csv
+outputs/models/*.txt
+outputs/models/*.csv
+outputs/figures/**/*.png
+outputs/tables/**/*.csv
+outputs/models/**/*.txt
+outputs/models/**/*.csv

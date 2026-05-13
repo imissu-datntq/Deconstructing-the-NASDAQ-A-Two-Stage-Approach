@@ -1,0 +1,51 @@
+sample:
+  start: "1990-01-01"
+  end: null
+
+series:
+  INDPRO: INDPRO
+  CPIAUCNS: CPIAUCNS
+  FEDFUNDS: FEDFUNDS
+  NASDAQCOM: NASDAQCOM
+
+stage1:
+  stl_period: 21
+  seasonal_window: 13
+  trend_window: null
+  robust: true
+  inner_iter: null
+  outer_iter: null
+  log_input: true
+  fill_method: ffill
+
+stage2:
+  ordering:
+    - INDPRO
+    - CPIAUCNS
+    - FEDFUNDS
+    - NASDAQ_SA
+  transforms:
+    INDPRO: log_diff
+    CPIAUCNS: log_diff
+    FEDFUNDS: level
+    NASDAQ_SA: log_diff
+  maxlags: 18
+  ic: aic
+  fallback_lag: 2
+  irf_horizon: 24
+  fevd_horizon: 24
+  irf_confidence_level: 0.90
+  irf_errband_repl: 400
+  irf_errband_burn: 100
+  irf_errband_seed: 2026
+  compute_irf_bands: true
+  policy_shock_variable: FEDFUNDS
+  equity_response_variable: NASDAQ_SA
+
+paths:
+  raw_dir: data/raw
+  interim_dir: data/interim
+  processed_dir: data/processed
+  figures_dir: outputs/figures
+  tables_dir: outputs/tables
+  models_dir: outputs/models

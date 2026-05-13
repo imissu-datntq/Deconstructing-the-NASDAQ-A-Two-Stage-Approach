@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nasdaq-two-stage-svar"
+version = "0.1.0"
+description = "Two-stage STL + recursive SVAR pipeline for NASDAQ monetary policy shock analysis."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.26",
+  "pandas>=2.1",
+  "statsmodels>=0.14",
+  "matplotlib>=3.8",
+  "pyyaml>=6.0",
+  "requests>=2.31",
+]
+
+[project.scripts]
+nasdaq-svar = "nasdaq_svar.cli:main"
+nasdaq-sensitivity = "nasdaq_svar.sensitivity_cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,3 +1,16 @@
+Metadata-Version: 2.4
+Name: nasdaq-two-stage-svar
+Version: 0.1.0
+Summary: Two-stage STL + recursive SVAR pipeline for NASDAQ monetary policy shock analysis.
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: numpy>=1.26
+Requires-Dist: pandas>=2.1
+Requires-Dist: statsmodels>=0.14
+Requires-Dist: matplotlib>=3.8
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: requests>=2.31
+
 # Deconstructing the NASDAQ: Two-Stage STL + SVAR
 
 This repository implements the research workflow from your outline:
