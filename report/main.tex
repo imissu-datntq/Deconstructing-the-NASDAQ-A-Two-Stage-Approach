@@ -1,0 +1,365 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{fontspec}
+\setmainfont{Times New Roman}
+\usepackage{amsmath,amssymb,bm}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{siunitx}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{setspace}
+\usepackage{titlesec}
+
+\graphicspath{{../outputs/figures/}{../outputs/figures/baseline_robustness/}}
+
+\onehalfspacing
+\setlength{\parskip}{0.5em}
+\setlength{\parindent}{0pt}
+\titleformat{\section}{\bfseries\large}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\bfseries\normalsize}{\thesubsection.}{0.5em}{}
+
+\title{\textbf{Giải mã NASDAQ bằng Tiếp cận Hai Giai đoạn:\\
+Phân rã STL và SVAR Cấu trúc cho Cú sốc Chính sách Tiền tệ}}
+\author{Sinh viên thực hiện: \underline{\hspace{5cm}}\\
+Giảng viên hướng dẫn: \underline{\hspace{5cm}}}
+\date{Tháng 05 năm 2026}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+\newpage
+
+\begin{abstract}
+Nghiên cứu này triển khai một khung thực nghiệm hai giai đoạn để đo lường phản ứng của NASDAQ trước cú sốc chính sách tiền tệ của Cục Dự trữ Liên bang Mỹ (Fed). Giai đoạn 1 sử dụng phân rã STL robust trên dữ liệu NASDAQ hằng ngày nhằm loại bỏ thành phần mùa vụ và nhiễu lịch, sau đó đồng bộ về tần suất tháng bằng điểm cuối tháng. Giai đoạn 2 ước lượng VAR/SVAR nhận dạng Cholesky theo trật tự \texttt{INDPRO} $\rightarrow$ \texttt{CPIAUCNS} $\rightarrow$ \texttt{FEDFUNDS} $\rightarrow$ \texttt{NASDAQ\_SA}. Dữ liệu được lấy từ FRED trong giai đoạn 01/1990--05/2026.
+
+Kết quả baseline cho thấy phản ứng tức thời của NASDAQ với cú sốc thắt chặt lãi suất là âm ở mức \(-0.1166\), chạm đáy tại tháng thứ 2 với biên độ \(-0.3817\), sau đó bật lại dương ngắn hạn rồi hội tụ dần về 0. Tỷ trọng phương sai sai số dự báo của NASDAQ do cú sốc lãi suất đóng góp vào khoảng \(0.93\%\) ở chân trời 12--24 tháng. Kiểm tra độ bền trên 5 đặc tả cho thấy dấu của phản ứng cực trị nhất quán âm, nhưng độ lớn phụ thuộc lựa chọn lag và phép biến đổi biến. Nghiên cứu cung cấp một quy trình tái lập đầy đủ ở mức code-package và notebook narrative, phù hợp cả cho đánh giá học thuật lẫn tái sử dụng thực nghiệm.
+\end{abstract}
+
+\textbf{Từ khóa:} NASDAQ, STL decomposition, SVAR, monetary policy shock, IRF, FEVD.
+
+\newpage
+\tableofcontents
+\newpage
+\listoffigures
+\newpage
+\listoftables
+\newpage
+
+\section{Giới thiệu}
+
+Cơ chế truyền dẫn chính sách tiền tệ tới thị trường tài sản rủi ro là một chủ đề trung tâm trong kinh tế vĩ mô tài chính. Với đặc trưng gồm nhiều doanh nghiệp tăng trưởng, giá trị NASDAQ phụ thuộc mạnh vào dòng tiền kỳ vọng trong tương lai và do đó nhạy cảm với lãi suất chiết khấu. Câu hỏi nghiên cứu chính của đề tài là:
+
+\begin{itemize}[leftmargin=1.5em]
+    \item NASDAQ phản ứng như thế nào theo thời gian trước một cú sốc thắt chặt tiền tệ bất ngờ?
+    \item Mức độ biến động của NASDAQ do cú sốc lãi suất giải thích là bao nhiêu so với các cú sốc vĩ mô khác?
+\end{itemize}
+
+Đề tài đóng góp ở ba điểm. Thứ nhất, xây dựng quy trình hai giai đoạn kết hợp xử lý vi cấu trúc dữ liệu tài chính bằng STL và nhận dạng cấu trúc vĩ mô bằng SVAR. Thứ hai, xử lý nhất quán vấn đề lệch tần suất giữa biến tài chính hằng ngày và biến vĩ mô hằng tháng bằng chiến lược lấy điểm cuối tháng sau khử mùa vụ. Thứ ba, triển khai project dưới dạng package tái lập được, kèm notebook thuyết minh.
+
+\section{Tổng quan y văn và khoảng trống nghiên cứu}
+
+Trong y văn VAR/SVAR, bài toán nhận dạng là trọng tâm từ \citet{sims1980}. Các chiến lược nhận dạng dựa trên zero restrictions có ưu điểm rõ ràng nhưng có thể quá cứng nhắc với biến tài chính phản ứng nhanh. Cách tiếp cận sign restrictions của \citet{uhlig2005} mở rộng không gian nhận dạng nhưng đối mặt rủi ro nhận dạng sai cú sốc như phân tích của \citet{wolf2020}. Proxy-SVAR \citep{gertler2015} cải thiện nhận dạng chính sách, nhưng phụ thuộc điều kiện thông tin và dữ liệu tần suất cao.
+
+Song song, y văn dị thường lịch chứng minh lợi suất cổ phiếu chứa thành phần mùa vụ hệ thống (turn-of-month, January effect, v.v.) \citep{ariel1987,mccconnell2008}. Do đó, đưa trực tiếp NASDAQ thô vào SVAR có thể làm nhiễu phần dư cấu trúc. Khoảng trống chính là thiếu quy trình tiền xử lý mùa vụ một cách nguyên tắc trước khi nhận dạng cú sốc tiền tệ trong mô hình SVAR.
+
+\section{Dữ liệu và kiến trúc biến}
+
+\subsection{Nguồn dữ liệu}
+
+Toàn bộ dữ liệu được lấy từ FRED \citep{fred}. Mẫu nghiên cứu sử dụng trong project hiện tại là 01/1990 đến 05/2026.
+
+\begin{table}[H]
+\centering
+\caption{Danh mục biến và vai trò trong mô hình}
+\label{tab:data}
+\begin{tabular}{llll}
+\toprule
+Biến & Mã FRED & Tần suất gốc & Vai trò \\
+\midrule
+Sản lượng công nghiệp & \texttt{INDPRO} & Tháng & Biến 1 (slow-moving) \\
+Chỉ số giá tiêu dùng & \texttt{CPIAUCNS} & Tháng & Biến 2 (price stickiness) \\
+Lãi suất quỹ liên bang & \texttt{FEDFUNDS} & Tháng & Biến chính sách \\
+NASDAQ Composite & \texttt{NASDAQCOM} & Ngày & Biến tài sản tài chính \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Xử lý lệch tần suất}
+
+Các biến vĩ mô giữ ở tần suất tháng. NASDAQ được xử lý theo hai bước:
+\begin{enumerate}[leftmargin=1.5em]
+    \item Khử mùa vụ trên chuỗi ngày bằng STL robust.
+    \item Lấy quan sát ngày giao dịch cuối tháng để đồng bộ hóa với khung tháng.
+\end{enumerate}
+
+Chiến lược này tránh làm phẳng thông tin nếu dùng trung bình tháng cơ học.
+
+\section{Phương pháp nghiên cứu}
+
+\subsection{Giai đoạn 1: STL robust}
+
+Chuỗi NASDAQ được phân rã theo dạng cộng:
+\begin{equation}
+Y_t = T_t + S_t + R_t,
+\end{equation}
+trong đó \(T_t\) là xu hướng, \(S_t\) là mùa vụ, \(R_t\) là phần dư.
+
+Sau khi ước lượng STL \citep{cleveland1990}, chuỗi đã khử mùa vụ là:
+\begin{equation}
+Y_t^{(sa)} = Y_t - S_t.
+\end{equation}
+
+Mô hình dùng STL robust, tức là các điểm ngoại lai nhận trọng số nhỏ hơn trong vòng lặp:
+\begin{equation}
+w_t = B\!\left(\frac{|R_t|}{6\cdot \text{MAD}(R)}\right), \quad
+B(u)=
+\begin{cases}
+(1-u^2)^2,& |u|<1,\\
+0,& |u|\ge 1.
+\end{cases}
+\end{equation}
+
+\subsection{Giai đoạn 2: VAR/SVAR nhận dạng Cholesky}
+
+VAR dạng rút gọn:
+\begin{equation}
+\bm{y}_t = \bm{c} + \sum_{i=1}^{p} A_i \bm{y}_{t-i} + \bm{u}_t,\quad
+\bm{u}_t \sim (0,\Sigma_u).
+\end{equation}
+
+SVAR dạng recursive:
+\begin{equation}
+\bm{u}_t = B \bm{\varepsilon}_t,\quad \mathbb{E}[\bm{\varepsilon}_t\bm{\varepsilon}_t']=I,
+\end{equation}
+với \(B\) là ma trận tam giác dưới từ phân rã Cholesky của \(\Sigma_u\).
+
+Thứ tự nhận dạng:
+\[
+\texttt{INDPRO} \rightarrow \texttt{CPIAUCNS} \rightarrow \texttt{FEDFUNDS} \rightarrow \texttt{NASDAQ\_SA}.
+\]
+
+\subsection{Suy luận động}
+
+Hai công cụ chính:
+\begin{itemize}[leftmargin=1.5em]
+    \item IRF trực giao: quỹ đạo phản ứng của NASDAQ trước cú sốc 1 độ lệch chuẩn ở \texttt{FEDFUNDS}.
+    \item FEVD: tỷ trọng phương sai sai số dự báo của NASDAQ do từng cú sốc giải thích theo các chân trời.
+\end{itemize}
+
+\section{Triển khai thực nghiệm và tái lập}
+
+Project được đóng gói theo hướng \textit{research as a package}:
+\begin{itemize}[leftmargin=1.5em]
+    \item Pipeline tự động: tải dữ liệu, xử lý STL, ước lượng VAR/SVAR, xuất bảng/hình.
+    \item Notebook narrative: EDA, diagnostics, inference, robustness cho mục tiêu trình bày học thuật.
+\end{itemize}
+
+Lệnh chạy chính:
+\begin{verbatim}
+py -m pip install -e .
+py -m nasdaq_svar.cli --config configs/default.yaml --project-root .
+py -m nasdaq_svar.sensitivity_cli --plan configs/sensitivity.yaml --project-root .
+\end{verbatim}
+
+\section{Kết quả thực nghiệm}
+
+\subsection{Kết quả tiền xử lý và tính dừng}
+
+Sau STL, mẫu ngày của NASDAQ dùng trong decomposition là 9,486 quan sát (01/1990--05/2026), và chuỗi tháng sau đồng bộ có 437 quan sát trước biến đổi, 432 quan sát sau biến đổi (do sai phân log).
+
+Độ lệch giữa cách lấy điểm cuối tháng và trung bình tháng trên chuỗi NASDAQ đã khử mùa vụ:
+\[
+\text{Median }| \text{EOM} - \text{Mean} | = 49.854.
+\]
+Điều này xác nhận lựa chọn \textit{end-of-month sampling} là đáng kể về mặt thông tin.
+
+\begin{table}[H]
+\centering
+\caption{Kiểm định ADF trên bộ dữ liệu Stage-2 sau biến đổi}
+\label{tab:adf}
+\begin{tabular}{lrrrr}
+\toprule
+Biến & ADF stat & p-value & Lags & Kết luận 5\% \\
+\midrule
+\texttt{INDPRO} & -15.2743 & $4.67\times10^{-28}$ & 1 & Dừng \\
+\texttt{CPIAUCNS} & -4.1962 & 0.0007 & 11 & Dừng \\
+\texttt{FEDFUNDS} & -3.4223 & 0.0102 & 6 & Dừng \\
+\texttt{NASDAQ\_SA} & -18.9331 & \textless 0.0001 & 0 & Dừng \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Chọn lag và chẩn đoán VAR}
+
+\begin{table}[H]
+\centering
+\caption{Độ trễ đề xuất theo tiêu chí thông tin}
+\label{tab:lag}
+\begin{tabular}{lcccc}
+\toprule
+Tiêu chí & AIC & BIC & HQIC & FPE \\
+\midrule
+Lag đề xuất & 4 & 2 & 2 & 4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Đặc tả baseline chọn \(p=4\) theo AIC. Mô hình ổn định với mô-đun lớn nhất của nghiệm nghịch đảo là 0.9532 (\(<1\)). Tuy nhiên, kiểm định whiteness phần dư tại 12 lag cho p-value \(=0.00015\), cho thấy còn dấu hiệu tự tương quan phần dư. Đây là giới hạn cần xử lý thêm ở bước mở rộng (BVAR, lag dài hơn, hoặc biến kiểm soát bổ sung).
+
+\subsection{IRF và FEVD: kết quả baseline}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{irf_nasdaq_response.png}
+    \caption{IRF của \texttt{NASDAQ\_SA} trước cú sốc \texttt{FEDFUNDS} (kèm dải MC 90\%).}
+    \label{fig:irf}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{IRF tại các chân trời chọn lọc}
+\label{tab:irf-key}
+\begin{tabular}{rccc}
+\toprule
+Horizon (tháng) & IRF & Lower (90\%) & Upper (90\%) \\
+\midrule
+0  & -0.1166 & -0.5558 & 0.4034 \\
+1  & -0.2122 & -0.7089 & 0.3391 \\
+2  & -0.3817 & -0.8541 & 0.0814 \\
+3  & 0.3570  & 0.0075  & 0.7526 \\
+6  & 0.0884  & -0.1029 & 0.2693 \\
+12 & 0.0101  & -0.0980 & 0.1044 \\
+24 & -0.0226 & -0.1118 & 0.0490 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Phản ứng tức thời (h=0) là âm \(-0.1166\), chạm đáy tại h=2 với \(-0.3817\), sau đó bật lại dương ngắn hạn (h=3) rồi quay về gần 0. Dải tin cậy cho thấy giai đoạn đáy âm chưa tách biệt hoàn toàn khỏi 0, trong khi phản ứng dương tại h=3 vượt 0 ở cận dưới.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fevd_nasdaq.png}
+    \caption{FEVD của \texttt{NASDAQ\_SA}.}
+    \label{fig:fevd}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{FEVD của NASDAQ theo chân trời chọn lọc}
+\label{tab:fevd-key}
+\begin{tabular}{rcccc}
+\toprule
+Horizon & Shock INDPRO & Shock CPIAUCNS & Shock FEDFUNDS & Shock NASDAQ\_SA \\
+\midrule
+1  & 0.10\% & 0.03\% & 0.03\% & 99.84\% \\
+3  & 0.33\% & 0.34\% & 0.51\% & 98.82\% \\
+6  & 0.51\% & 0.69\% & 0.86\% & 97.94\% \\
+12 & 0.51\% & 0.70\% & 0.93\% & 97.86\% \\
+24 & 0.51\% & 0.70\% & 0.93\% & 97.86\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Ở horizon 12--24 tháng, cú sốc lãi suất giải thích khoảng 0.93\% phương sai sai số dự báo của NASDAQ, thấp hơn nhiều so với phần tự thân của NASDAQ. Hàm ý: cú sốc chính sách có tín hiệu động, nhưng không phải nguồn chi phối chính của toàn bộ biến động thị trường công nghệ trong mẫu dài hạn.
+
+\subsection{Kiểm tra độ bền (robustness)}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{sensitivity_irf_comparison.png}
+    \caption{So sánh IRF giữa các kịch bản độ bền.}
+    \label{fig:robustness-irf}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{Tóm tắt 5 kịch bản độ bền}
+\label{tab:robustness}
+\begin{tabular}{lrrrr}
+\toprule
+Kịch bản & Lag & IRF h=0 & IRF đáy & FEVD (12m) \\
+\midrule
+baseline\_aic & 4 & -0.1166 & -0.3817 (h=2) & 0.93\% \\
+bic\_selection & 2 & 0.0120 & -0.1489 (h=1) & 0.07\% \\
+fedfunds\_first\_difference & 3 & -0.1136 & -0.4188 (h=2) & 0.94\% \\
+shorter\_lag\_search & 4 & -0.1166 & -0.3817 (h=2) & 0.93\% \\
+stl\_level\_decomposition & 4 & -0.0417 & -0.3603 (h=2) & 0.95\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Tất cả kịch bản đều cho giá trị cực tiểu IRF âm, với khoảng \([-0.4188, -0.1489]\). Điều này ủng hộ tính nhất quán định tính của kết luận: phản ứng co lại của NASDAQ sau cú sốc thắt chặt tiền tệ là bền vững theo đặc tả.
+
+\section{Thảo luận}
+
+Kết quả cho thấy hai tầng thông điệp. Ở tầng động học ngắn hạn, cú sốc lãi suất gây tác động âm đáng kể về biên độ điểm ước lượng, phù hợp trực giác chi phí vốn. Ở tầng phương sai dài hơn, phần đóng góp của cú sốc chính sách vào biến động tổng thể NASDAQ còn hạn chế, ngụ ý các cú sốc khác (đặc thù ngành công nghệ, định giá kỳ vọng, rủi ro toàn cầu) chiếm ưu thế.
+
+Điểm mạnh của thiết kế là tách được nhiễu mùa vụ trước khi nhận dạng cấu trúc, làm giảm nguy cơ đánh tráo giữa dị thường lịch và cú sốc vĩ mô. Điểm yếu còn lại là dư địa cải thiện chẩn đoán phần dư VAR và tăng cường nhận dạng (ví dụ high-frequency instruments).
+
+\section{Hạn chế và hướng mở rộng}
+
+\begin{itemize}[leftmargin=1.5em]
+    \item \textbf{Chẩn đoán phần dư}: whiteness test cho tín hiệu còn tự tương quan.
+    \item \textbf{Nhận dạng}: recursive Cholesky phụ thuộc mạnh vào thứ tự biến.
+    \item \textbf{Biến quan sát}: bộ biến 4 chiều còn gọn; có thể bổ sung thất nghiệp, kỳ vọng lạm phát, chỉ số điều kiện tài chính.
+    \item \textbf{Mở rộng kỹ thuật}: BVAR, TVP-VAR, proxy-SVAR hoặc local projections để kiểm tra độ nhạy phương pháp.
+\end{itemize}
+
+\section{Kết luận}
+
+Nghiên cứu đã hiện thực hóa đầy đủ đề cương ban đầu bằng một hệ thống hai giai đoạn STL + SVAR có khả năng tái lập. Bằng chứng thực nghiệm cho thấy NASDAQ có phản ứng co lại sau cú sốc thắt chặt lãi suất, đạt cực tiểu vào khoảng tháng thứ hai. Tuy nhiên, xét theo FEVD, cú sốc chính sách chỉ giải thích một tỷ trọng nhỏ trong tổng phương sai biến động NASDAQ ở trung hạn và dài hạn.
+
+Về học thuật, đóng góp trọng tâm của đề tài nằm ở kết nối giữa xử lý vi cấu trúc dữ liệu tài chính và nhận dạng nhân quả vĩ mô. Về thực hành, dự án cung cấp cả pipeline tự động và notebook narrative, phù hợp cho cả yêu cầu chấm điểm đồ án và tái sử dụng nghiên cứu.
+
+\newpage
+\appendix
+\section{Phụ lục A: Tái lập kết quả}
+
+\begin{enumerate}[leftmargin=1.5em]
+    \item Cài package:
+\begin{verbatim}
+py -m pip install -e .
+\end{verbatim}
+    \item Chạy baseline:
+\begin{verbatim}
+py -m nasdaq_svar.cli --config configs/default.yaml --project-root .
+\end{verbatim}
+    \item Chạy robustness:
+\begin{verbatim}
+py -m nasdaq_svar.sensitivity_cli --plan configs/sensitivity.yaml --project-root .
+\end{verbatim}
+    \item Notebook thuyết minh theo thứ tự:
+\begin{verbatim}
+notebooks/01_EDA_and_Data_Prep.ipynb
+notebooks/02_VAR_Modeling_and_Diagnostics.ipynb
+notebooks/03_SVAR_and_Inference.ipynb
+notebooks/04_Robustness_Checks.ipynb
+\end{verbatim}
+\end{enumerate}
+
+\section{Phụ lục B: Cấu trúc project}
+
+\begin{verbatim}
+configs/        # parameter files
+src/nasdaq_svar # package source code
+scripts/        # run entry points
+data/           # raw, interim, processed
+outputs/        # figures, tables, models
+notebooks/      # narrative workflow
+report/         # this LaTeX report
+\end{verbatim}
+
+\newpage
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}
+

@@ -1,3 +1,4 @@
 [console_scripts]
+nasdaq-forecast = nasdaq_svar.forecast_cli:main
 nasdaq-sensitivity = nasdaq_svar.sensitivity_cli:main
 nasdaq-svar = nasdaq_svar.cli:main

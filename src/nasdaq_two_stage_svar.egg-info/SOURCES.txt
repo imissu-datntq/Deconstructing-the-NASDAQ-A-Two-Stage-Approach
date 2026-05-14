@@ -4,6 +4,8 @@ src/nasdaq_svar/__init__.py
 src/nasdaq_svar/cli.py
 src/nasdaq_svar/config.py
 src/nasdaq_svar/data.py
+src/nasdaq_svar/forecast.py
+src/nasdaq_svar/forecast_cli.py
 src/nasdaq_svar/pipeline.py
 src/nasdaq_svar/presentation.py
 src/nasdaq_svar/reporting.py
@@ -18,6 +20,7 @@ src/nasdaq_two_stage_svar.egg-info/dependency_links.txt
 src/nasdaq_two_stage_svar.egg-info/entry_points.txt
 src/nasdaq_two_stage_svar.egg-info/requires.txt
 src/nasdaq_two_stage_svar.egg-info/top_level.txt
+tests/test_forecast.py
 tests/test_presentation.py
 tests/test_stage1_stl.py
 tests/test_stage2_svar.py

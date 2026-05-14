@@ -1,0 +1,78 @@
+sample:
+  start: "1990-01-01"
+  end: null
+
+series:
+  INDPRO: INDPRO
+  CPIAUCNS: CPIAUCNS
+  FEDFUNDS: FEDFUNDS
+  NASDAQCOM: NASDAQCOM
+
+stage1:
+  stl_period: 21
+  seasonal_window: 13
+  trend_window: null
+  robust: true
+  inner_iter: null
+  outer_iter: null
+  log_input: true
+  fill_method: ffill
+
+stage2:
+  ordering:
+    - INDPRO
+    - CPIAUCNS
+    - FEDFUNDS
+    - NASDAQ_SA
+  transforms:
+    INDPRO: log_diff
+    CPIAUCNS: log_diff
+    FEDFUNDS: level
+    NASDAQ_SA: log_diff
+  maxlags: 18
+  ic: aic
+  fallback_lag: 2
+  irf_horizon: 24
+  fevd_horizon: 24
+  irf_confidence_level: 0.90
+  irf_errband_repl: 400
+  irf_errband_burn: 100
+  irf_errband_seed: 2026
+  compute_irf_bands: true
+  policy_shock_variable: FEDFUNDS
+  equity_response_variable: NASDAQ_SA
+
+forecast:
+  input_csv: data/interim/nasdaq_deseasonalized_monthly.csv
+  target_column: NASDAQ_SA
+  horizon: 12
+  confidence_level: 0.90
+  output_tag: baseline
+  evaluation:
+    train_ratio: 0.70
+    valid_ratio: 0.15
+    min_train_size: 72
+  model_space:
+    include_arima: true
+    include_sarima: true
+    p_values: [0, 1, 2]
+    d_values: [0, 1]
+    q_values: [0, 1, 2]
+    P_values: [0, 1]
+    D_values: [0, 1]
+    Q_values: [0, 1]
+    seasonal_period: 12
+    max_candidates: 60
+  runtime:
+    enforce_stationarity: false
+    enforce_invertibility: false
+  diagnostics:
+    ljung_box_lags: 12
+
+paths:
+  raw_dir: data/raw
+  interim_dir: data/interim
+  processed_dir: data/processed
+  figures_dir: outputs/figures
+  tables_dir: outputs/tables
+  models_dir: outputs/models

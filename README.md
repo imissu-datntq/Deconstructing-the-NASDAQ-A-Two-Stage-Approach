@@ -12,7 +12,8 @@ This repository implements the research workflow from your outline:
 .
 |- configs/
 |  |- default.yaml
-|  `- sensitivity.yaml
+|  |- sensitivity.yaml
+|  `- forecast.yaml
 |- data/
 |  |- raw/
 |  |- interim/
@@ -23,17 +24,25 @@ This repository implements the research workflow from your outline:
 |  `- tables/
 |- scripts/
 |  |- run_pipeline.py
-|  `- run_sensitivity.py
+|  |- run_sensitivity.py
+|  `- run_forecast.py
+|- app/
+|  `- streamlit_app.py
 |- notebooks/
 |  |- 01_EDA_and_Data_Prep.ipynb
 |  |- 02_VAR_Modeling_and_Diagnostics.ipynb
 |  |- 03_SVAR_and_Inference.ipynb
 |  |- 04_Robustness_Checks.ipynb
+|  |- 05_Forecast_Data_and_Splits.ipynb
+|  |- 06_ARIMA_SARIMA_Tuning.ipynb
+|  `- 07_Backtest_and_Final_Forecast.ipynb
 |  `- README.md
 |- src/nasdaq_svar/
 |  |- cli.py
 |  |- config.py
 |  |- data.py
+|  |- forecast.py
+|  |- forecast_cli.py
 |  |- pipeline.py
 |  |- reporting.py
 |  |- sensitivity.py
@@ -41,6 +50,10 @@ This repository implements the research workflow from your outline:
 |  |- stage1_stl.py
 |  |- stage2_svar.py
 |  `- transforms.py
+|- report/
+|  |- main.tex
+|  |- references.bib
+|  `- README.md
 `- tests/
 ```
 
@@ -78,6 +91,24 @@ or
 python scripts/run_sensitivity.py --plan configs/sensitivity.yaml
 ```
 
+## Run Forecasting Pipeline (ARIMA/SARIMA)
+
+```bash
+nasdaq-forecast --config configs/forecast.yaml
+```
+
+or
+
+```bash
+python scripts/run_forecast.py --config configs/forecast.yaml
+```
+
+## Run Streamlit Forecast UI
+
+```bash
+streamlit run app/streamlit_app.py
+```
+
 ## Notebook Workflow
 
 For report writing and grading-friendly walkthrough, open notebooks in this order:
@@ -86,6 +117,9 @@ For report writing and grading-friendly walkthrough, open notebooks in this orde
 2. `notebooks/02_VAR_Modeling_and_Diagnostics.ipynb`
 3. `notebooks/03_SVAR_and_Inference.ipynb`
 4. `notebooks/04_Robustness_Checks.ipynb`
+5. `notebooks/05_Forecast_Data_and_Splits.ipynb`
+6. `notebooks/06_ARIMA_SARIMA_Tuning.ipynb`
+7. `notebooks/07_Backtest_and_Final_Forecast.ipynb`
 
 These notebooks import functions from `nasdaq_svar` directly, so narrative analysis stays consistent with the production pipeline.
 Each notebook ends with an auto-generated **Slide-Ready Conclusion** cell for presentation/reporting.
@@ -103,6 +137,11 @@ Each notebook ends with an auto-generated **Slide-Ready Conclusion** cell for pr
 - `outputs/figures/fevd_nasdaq.png`: FEVD plot
 - `outputs/tables/<scenario_tag>/sensitivity_summary.csv`: cross-scenario summary
 - `outputs/figures/<scenario_tag>/sensitivity_irf_comparison.png`: IRF comparison across scenarios
+- `outputs/tables/forecasts/<tag>/candidate_scores.csv`: ARIMA/SARIMA validation scores
+- `outputs/tables/forecasts/<tag>/backtest_metrics.csv`: validation/test backtest metrics
+- `outputs/tables/forecasts/<tag>/model_diagnostics.csv`: residual diagnostics (Ljung-Box, Jarque-Bera)
+- `outputs/tables/forecasts/<tag>/forecast_points.csv`: out-of-sample forecast with intervals
+- `outputs/figures/forecasts/<tag>/forecast_plot.png`: forecast visualization
 
 ## Methodological Notes
 
